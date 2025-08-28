@@ -1,0 +1,122 @@
+package org.example.controller;
+
+import lombok.extern.slf4j.Slf4j;
+import org.example.exception.AccountNotFoundException;
+import org.example.exception.EmailAlreadyExistsException;
+import org.example.exception.InsufficientFundsException;
+import org.example.exception.UserHasAssociatedAccountsException;
+import org.example.exception.UserNotFoundException;
+import org.example.model.BadRequestErrorResponse;
+import org.example.model.BadRequestErrorResponseDetailsInner;
+import org.example.model.ErrorResponse;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Global exception handler for the Eagle Bank API
+ * Returns proper error responses according to the OpenAPI specification
+ */
+@RestControllerAdvice
+@Slf4j
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleUserNotFoundException(UserNotFoundException e) {
+        log.warn("User not found: {}", e.getMessage());
+        ErrorResponse errorResponse = new ErrorResponse();
+        errorResponse.setMessage(e.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+    }
+
+    @ExceptionHandler(EmailAlreadyExistsException.class)
+    public ResponseEntity<BadRequestErrorResponse> handleEmailAlreadyExistsException(EmailAlreadyExistsException e) {
+        log.warn("Email already exists: {}", e.getMessage());
+
+        BadRequestErrorResponse errorResponse = new BadRequestErrorResponse();
+        errorResponse.setMessage("Invalid details supplied");
+
+        BadRequestErrorResponseDetailsInner detail = new BadRequestErrorResponseDetailsInner();
+        detail.setField("email");
+        detail.setMessage("Email already exists");
+        detail.setType("EMAIL_ALREADY_EXISTS");
+
+        errorResponse.setDetails(List.of(detail));
+        return ResponseEntity.badRequest().body(errorResponse);
+    }
+
+    @ExceptionHandler(UserHasAssociatedAccountsException.class)
+    public ResponseEntity<ErrorResponse> handleUserHasAssociatedAccountsException(UserHasAssociatedAccountsException e) {
+        log.warn("User has associated accounts: {}", e.getMessage());
+        ErrorResponse errorResponse = new ErrorResponse();
+        errorResponse.setMessage(e.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
+    }
+
+    @ExceptionHandler(AccountNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleAccountNotFoundException(AccountNotFoundException e) {
+        log.warn("Account not found: {}", e.getMessage());
+        ErrorResponse errorResponse = new ErrorResponse();
+        errorResponse.setMessage(e.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+    }
+
+    @ExceptionHandler(InsufficientFundsException.class)
+    public ResponseEntity<ErrorResponse> handleInsufficientFundsException(InsufficientFundsException e) {
+        log.warn("Insufficient funds: {}", e.getMessage());
+        ErrorResponse errorResponse = new ErrorResponse();
+        errorResponse.setMessage(e.getMessage());
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(errorResponse);
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ErrorResponse> handleAuthenticationException(AuthenticationException e) {
+        log.warn("Authentication failed: {}", e.getMessage());
+        ErrorResponse errorResponse = new ErrorResponse();
+        errorResponse.setMessage("Access token is missing or invalid");
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDeniedException(AccessDeniedException e) {
+        log.warn("Access denied: {}", e.getMessage());
+        ErrorResponse errorResponse = new ErrorResponse();
+        errorResponse.setMessage("The user is not allowed to access this resource");
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse);
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<BadRequestErrorResponse> handleValidationException(MethodArgumentNotValidException e) {
+        log.warn("Validation failed: {}", e.getMessage());
+
+        BadRequestErrorResponse errorResponse = new BadRequestErrorResponse();
+        errorResponse.setMessage("Invalid details supplied");
+
+        List<BadRequestErrorResponseDetailsInner> details = new ArrayList<>();
+        e.getBindingResult().getFieldErrors().forEach(error -> {
+            BadRequestErrorResponseDetailsInner detail = new BadRequestErrorResponseDetailsInner();
+            detail.setField(error.getField());
+            detail.setMessage(error.getDefaultMessage());
+            detail.setType("VALIDATION_ERROR");
+            details.add(detail);
+        });
+
+        errorResponse.setDetails(details);
+        return ResponseEntity.badRequest().body(errorResponse);
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErrorResponse> handleGenericException(Exception e) {
+        log.error("Unexpected error: {}", e.getMessage(), e);
+        ErrorResponse errorResponse = new ErrorResponse();
+        errorResponse.setMessage("An unexpected error occurred");
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+    }
+}

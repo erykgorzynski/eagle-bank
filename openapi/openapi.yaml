@@ -11,6 +11,8 @@ tags:
     description: Manage transactions on a bank account
   - name: user
     description: Manage a user
+  - name: auth
+    description: Authentication endpoints
 paths:
   /v1/accounts:
     post:
@@ -617,6 +619,55 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /v1/auth/login:
+    post:
+      tags:
+        - auth
+      summary: "Authenticate user and return JWT token"
+      operationId: loginUser
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - token
+                  - userId
+                properties:
+                  token:
+                    type: string
+                    description: "JWT access token"
+                  userId:
+                    type: string
+                    pattern: "^usr-[A-Za-z0-9]+$"
+        '400':
+          description: Invalid credentials supplied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestErrorResponse"
+        '401':
+          description: Invalid email or password
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   schemas:
     CreateBankAccountRequest:
@@ -783,6 +834,7 @@ components:
         - address
         - phoneNumber
         - email
+        - password
       properties:
         name:
           type: string
@@ -813,7 +865,11 @@ components:
           format: ^\+[1-9]\d{1,14}$
         email:
           type: string
-          format: email    
+          format: email
+        password:
+          type: string
+          minLength: 8
+          description: "Password must be at least 8 characters long and contain a mix of letters, numbers, and special characters"
     UpdateUserRequest:
       type: object
       properties:

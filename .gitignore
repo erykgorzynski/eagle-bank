@@ -42,6 +42,9 @@ buildNumber.properties
 !**/src/main/**/target/
 !**/src/test/**/target/
 
+# Generated sources - OpenAPI
+target/generated-sources/
+
 # IDE
 .idea/
 *.iws

@@ -3,13 +3,16 @@ package org.example.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.entity.Account;
+import org.example.entity.User;
 import org.example.exception.AccountNotFoundException;
+import org.example.exception.UserNotFoundException;
 import org.example.mapper.AccountMapper;
 import org.example.model.BankAccountResponse;
 import org.example.model.CreateBankAccountRequest;
 import org.example.model.ListBankAccountsResponse;
 import org.example.model.UpdateBankAccountRequest;
 import org.example.repository.AccountRepository;
+import org.example.repository.UserRepository;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,7 +22,7 @@ import java.util.UUID;
 
 /**
  * Service class for Account management operations
- * All operations include user ownership validation for security
+ * Updated to use JPA relationships instead of manual foreign key management
  */
 @Service
 @RequiredArgsConstructor
@@ -28,6 +31,7 @@ import java.util.UUID;
 public class AccountService {
 
     private final AccountRepository accountRepository;
+    private final UserRepository userRepository;
     private final AccountMapper accountMapper;
 
     /**
@@ -36,18 +40,30 @@ public class AccountService {
     public BankAccountResponse createAccount(String userId, CreateBankAccountRequest createBankAccountRequest) {
         log.info("Creating account for user: {}", userId);
 
+        // Find the user entity (required for JPA relationship)
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException(userId));
+
         // Map request to entity
         Account account = accountMapper.toEntity(createBankAccountRequest);
 
         // Set system-generated fields
         account.setAccountNumber(generateUniqueAccountNumber());
-        account.setUserId(userId);
         account.setBalance(0.0); // New accounts start with zero balance
         account.setCurrency(Account.Currency.GBP);
         account.setSortCode(Account.SortCode._10_10_10);
 
-        // Save account
-        Account savedAccount = accountRepository.save(account);
+        // Use the bidirectional relationship helper method instead of manual setting
+        user.addAccount(account); // This properly sets both sides of the relationship
+
+        // Save user (cascade will save the account as well due to CascadeType.ALL)
+        User savedUser = userRepository.save(user);
+
+        // Get the saved account from the user's accounts list
+        Account savedAccount = savedUser.getAccounts().stream()
+                .filter(acc -> acc.getAccountNumber().equals(account.getAccountNumber()))
+                .findFirst()
+                .orElse(account);
 
         log.info("Successfully created account {} for user {}", savedAccount.getAccountNumber(), userId);
         return accountMapper.toResponse(savedAccount);
@@ -63,20 +79,21 @@ public class AccountService {
         Account account = accountRepository.findByAccountNumber(accountNumber)
                 .orElseThrow(() -> new AccountNotFoundException(accountNumber));
 
-        // Verify ownership
+        // Verify ownership using JPA relationship
         validateAccountOwnership(account, userId);
 
         return accountMapper.toResponse(account);
     }
 
     /**
-     * List all accounts for a specific user
+     * List all accounts for a specific user using JPA relationship
      */
     @Transactional(readOnly = true)
     public ListBankAccountsResponse findAccountsByUserId(String userId) {
         log.info("Finding all accounts for user: {}", userId);
 
-        List<Account> accounts = accountRepository.findByUserId(userId);
+        // Use JPA relationship query
+        List<Account> accounts = accountRepository.findByUser_Id(userId);
         List<BankAccountResponse> accountResponses = accountMapper.toResponseList(accounts);
 
         ListBankAccountsResponse response = new ListBankAccountsResponse();
@@ -95,7 +112,7 @@ public class AccountService {
         Account existingAccount = accountRepository.findByAccountNumber(accountNumber)
                 .orElseThrow(() -> new AccountNotFoundException(accountNumber));
 
-        // Verify ownership
+        // Verify ownership using JPA relationship
         validateAccountOwnership(existingAccount, userId);
 
         // Update entity with non-null values from request
@@ -116,70 +133,29 @@ public class AccountService {
         Account account = accountRepository.findByAccountNumber(accountNumber)
                 .orElseThrow(() -> new AccountNotFoundException(accountNumber));
 
-        // Verify ownership
+        // Verify ownership using JPA relationship
         validateAccountOwnership(account, userId);
 
-        // TODO: Add business rules for account deletion
-        // - Check if account has transactions
-        // - Ensure account balance is zero
-        // For now, we'll allow deletion
+        // Check if account has transactions before deletion
+        if (!account.getTransactions().isEmpty()) {
+            log.warn("Cannot delete account {} as it has {} transactions", accountNumber, account.getTransactions().size());
+            throw new IllegalStateException("Cannot delete account with existing transactions");
+        }
 
-        accountRepository.delete(account);
+        // Check if account balance is zero
+        if (account.getBalance() != 0.0) {
+            log.warn("Cannot delete account {} as it has non-zero balance: {}", accountNumber, account.getBalance());
+            throw new IllegalStateException("Cannot delete account with non-zero balance");
+        }
+
+        // Use the bidirectional relationship helper method for proper cleanup
+        User user = account.getUser();
+        user.removeAccount(account); // This properly removes both sides of the relationship
+
+        // Save user (cascade will handle the account deletion due to orphanRemoval = true)
+        userRepository.save(user);
+
         log.info("Successfully deleted account {} for user {}", accountNumber, userId);
-    }
-
-    /**
-     * Check if an account exists (used for validation)
-     */
-    @Transactional(readOnly = true)
-    public boolean accountExists(String accountNumber) {
-        return accountRepository.existsByAccountNumber(accountNumber);
-    }
-
-    /**
-     * Check if an account is owned by a specific user
-     */
-    @Transactional(readOnly = true)
-    public boolean isAccountOwnedByUser(String accountNumber, String userId) {
-        return accountRepository.findByAccountNumber(accountNumber)
-                .map(account -> account.getUserId().equals(userId))
-                .orElse(false);
-    }
-
-    /**
-     * Check if a user has any associated accounts (used for user deletion validation)
-     */
-    @Transactional(readOnly = true)
-    public boolean hasAccountsForUser(String userId) {
-        return accountRepository.existsByUserId(userId);
-    }
-
-    /**
-     * Get account balance for transaction processing
-     */
-    @Transactional(readOnly = true)
-    public double getAccountBalance(String accountNumber, String userId) {
-        Account account = accountRepository.findByAccountNumber(accountNumber)
-                .orElseThrow(() -> new AccountNotFoundException(accountNumber));
-
-        validateAccountOwnership(account, userId);
-        return account.getBalance();
-    }
-
-    /**
-     * Update account balance (used by transaction service)
-     */
-    public void updateAccountBalance(String accountNumber, String userId, double newBalance) {
-        log.info("Updating balance for account {} to {}", accountNumber, newBalance);
-
-        Account account = accountRepository.findByAccountNumber(accountNumber)
-                .orElseThrow(() -> new AccountNotFoundException(accountNumber));
-
-        validateAccountOwnership(account, userId);
-        account.setBalance(newBalance);
-        accountRepository.save(account);
-
-        log.info("Successfully updated balance for account {}", accountNumber);
     }
 
     /**
@@ -209,12 +185,12 @@ public class AccountService {
     }
 
     /**
-     * Validate that the account is owned by the specified user
+     * Validate that the account is owned by the specified user using JPA relationship
      */
     private void validateAccountOwnership(Account account, String userId) {
-        if (!account.getUserId().equals(userId)) {
+        if (!account.getUser().getId().equals(userId)) {
             log.warn("User {} attempted to access account {} owned by user {}",
-                     userId, account.getAccountNumber(), account.getUserId());
+                     userId, account.getAccountNumber(), account.getUser().getId());
             throw new AccessDeniedException("Access denied to account");
         }
     }

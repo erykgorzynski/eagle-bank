@@ -9,26 +9,21 @@ import org.example.service.AccountService;
 import org.example.service.TransactionService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import jakarta.validation.Valid;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
+
 
 /**
  * Account Controller implementing both AccountApi and TransactionApi interfaces
  * Handles account and transaction management with proper authentication and authorization
  */
 @RestController
-@RequestMapping("/v1/accounts")
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RequiredArgsConstructor
 @Slf4j
-public class AccountController implements AccountApi, TransactionApi {
+public class AccountController extends BaseController implements AccountApi, TransactionApi {
 
     private final AccountService accountService;
     private final TransactionService transactionService;
@@ -36,7 +31,7 @@ public class AccountController implements AccountApi, TransactionApi {
     // ============= ACCOUNT OPERATIONS =============
 
     @Override
-    public ResponseEntity<BankAccountResponse> createAccount(@Valid CreateBankAccountRequest createBankAccountRequest) {
+    public ResponseEntity<BankAccountResponse> createAccount(CreateBankAccountRequest createBankAccountRequest) {
         String authenticatedUserId = getCurrentUserId();
         if (authenticatedUserId == null) {
             throw new org.springframework.security.core.AuthenticationException("User not authenticated") {};
@@ -82,7 +77,7 @@ public class AccountController implements AccountApi, TransactionApi {
     @Override
     public ResponseEntity<BankAccountResponse> updateAccountByAccountNumber(
             String accountNumber,
-            @Valid UpdateBankAccountRequest updateBankAccountRequest) {
+            UpdateBankAccountRequest updateBankAccountRequest) {
         String authenticatedUserId = getCurrentUserId();
         if (authenticatedUserId == null) {
             throw new org.springframework.security.core.AuthenticationException("User not authenticated") {};
@@ -97,7 +92,7 @@ public class AccountController implements AccountApi, TransactionApi {
     @Override
     public ResponseEntity<TransactionResponse> createTransaction(
             String accountNumber,
-            @Valid CreateTransactionRequest createTransactionRequest) {
+            CreateTransactionRequest createTransactionRequest) {
         String authenticatedUserId = getCurrentUserId();
         if (authenticatedUserId == null) {
             throw new org.springframework.security.core.AuthenticationException("User not authenticated") {};
@@ -139,26 +134,5 @@ public class AccountController implements AccountApi, TransactionApi {
         );
 
         return ResponseEntity.ok(transaction);
-    }
-
-    // ============= HELPER METHODS =============
-
-    /**
-     * Helper method to get current authenticated user ID from JWT token
-     */
-    private String getCurrentUserId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.isAuthenticated() && authentication.getPrincipal() instanceof String) {
-            return (String) authentication.getPrincipal();
-        }
-        return null;
-    }
-
-    /**
-     * Helper method to check if an account is owned by the specified user
-     * Now uses actual AccountService for ownership verification
-     */
-    private boolean isAccountOwnedByUser(String accountNumber, String userId) {
-        return accountService.isAccountOwnedByUser(accountNumber, userId);
     }
 }

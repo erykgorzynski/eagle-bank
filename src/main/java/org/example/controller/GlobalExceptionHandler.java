@@ -93,6 +93,15 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
     }
 
+    @ExceptionHandler(org.springframework.security.authentication.BadCredentialsException.class)
+    public ResponseEntity<ErrorResponse> handleBadCredentialsException(
+            org.springframework.security.authentication.BadCredentialsException e) {
+        log.warn("Authentication failed: {}", e.getMessage());
+        ErrorResponse errorResponse = new ErrorResponse();
+        errorResponse.setMessage("Invalid email or password");
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleAccessDeniedException(AccessDeniedException e) {
         log.warn("Access denied: {}", e.getMessage());
@@ -118,6 +127,56 @@ public class GlobalExceptionHandler {
         });
 
         errorResponse.setDetails(details);
+        return ResponseEntity.badRequest().body(errorResponse);
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<BadRequestErrorResponse> handleIllegalArgumentException(IllegalArgumentException e) {
+        log.warn("Invalid argument: {}", e.getMessage());
+
+        BadRequestErrorResponse errorResponse = new BadRequestErrorResponse();
+        errorResponse.setMessage("Invalid details supplied");
+
+        BadRequestErrorResponseDetailsInner detail = new BadRequestErrorResponseDetailsInner();
+        detail.setField("request");
+        detail.setMessage(e.getMessage());
+        detail.setType("INVALID_ARGUMENT");
+
+        errorResponse.setDetails(List.of(detail));
+        return ResponseEntity.badRequest().body(errorResponse);
+    }
+
+    @ExceptionHandler(org.springframework.web.bind.MissingServletRequestParameterException.class)
+    public ResponseEntity<BadRequestErrorResponse> handleMissingServletRequestParameterException(
+            org.springframework.web.bind.MissingServletRequestParameterException e) {
+        log.warn("Missing request parameter: {}", e.getMessage());
+
+        BadRequestErrorResponse errorResponse = new BadRequestErrorResponse();
+        errorResponse.setMessage("Invalid details supplied");
+
+        BadRequestErrorResponseDetailsInner detail = new BadRequestErrorResponseDetailsInner();
+        detail.setField(e.getParameterName());
+        detail.setMessage("Required parameter '" + e.getParameterName() + "' is missing");
+        detail.setType("MISSING_PARAMETER");
+
+        errorResponse.setDetails(List.of(detail));
+        return ResponseEntity.badRequest().body(errorResponse);
+    }
+
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    public ResponseEntity<BadRequestErrorResponse> handleHttpMessageNotReadableException(
+            org.springframework.http.converter.HttpMessageNotReadableException e) {
+        log.warn("Invalid request body: {}", e.getMessage());
+
+        BadRequestErrorResponse errorResponse = new BadRequestErrorResponse();
+        errorResponse.setMessage("Invalid details supplied");
+
+        BadRequestErrorResponseDetailsInner detail = new BadRequestErrorResponseDetailsInner();
+        detail.setField("request");
+        detail.setMessage("Invalid request body format");
+        detail.setType("INVALID_FORMAT");
+
+        errorResponse.setDetails(List.of(detail));
         return ResponseEntity.badRequest().body(errorResponse);
     }
 

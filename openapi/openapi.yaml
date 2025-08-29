@@ -385,7 +385,7 @@ paths:
           required: true
           schema:
             type: string
-            pattern: ^tan-[A-Za-z0-9]$
+            pattern: ^tan-[A-Za-z0-9]+$
       security:
         - bearerAuth: []
       responses:
@@ -645,25 +645,21 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - token
-                  - userId
-                properties:
-                  token:
-                    type: string
-                    description: "JWT access token"
-                  userId:
-                    type: string
-                    pattern: "^usr-[A-Za-z0-9]+$"
+                $ref: '#/components/schemas/LoginResponse'
         '400':
-          description: Invalid credentials supplied
+          description: Invalid request format - missing required fields, malformed email, or validation errors
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/BadRequestErrorResponse"
         '401':
-          description: Invalid email or password
+          description: Authentication failed - invalid email or password
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        '500':
+          description: Internal server error
           content:
             application/json:
               schema:
@@ -800,7 +796,7 @@ components:
       properties:
         id: 
           type: string
-          pattern: ^tan-[A-Za-z0-9]$
+          pattern: ^tan-[A-Za-z0-9]+$
           examples:
             - tan-123abc
         amount:
@@ -862,7 +858,7 @@ components:
               type: string
         phoneNumber:
           type: string
-          format: ^\+[1-9]\d{1,14}$
+          pattern: ^\+[1-9]\d{1,14}$
         email:
           type: string
           format: email
@@ -899,7 +895,7 @@ components:
               type: string
         phoneNumber:
           type: string
-          format: ^\+[1-9]\d{1,14}$
+          pattern: ^\+[1-9]\d{1,14}$
         email:
           type: string
           format: email
@@ -943,7 +939,7 @@ components:
               type: string
         phoneNumber:
           type: string
-          format: ^\+[1-9]\d{1,14}$
+          pattern: ^\+[1-9]\d{1,14}$
         email:
           type: string
           format: email
@@ -953,6 +949,18 @@ components:
         updatedTimestamp:
           type: string
           format: 'date-time'
+    LoginResponse:
+      type: object
+      required:
+        - token
+        - userId
+      properties:
+        token:
+          type: string
+          description: "JWT access token"
+        userId:
+          type: string
+          pattern: "^usr-[A-Za-z0-9]+$"
     ErrorResponse:
       type: object
       required:

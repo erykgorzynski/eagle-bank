@@ -11,18 +11,17 @@ import java.util.List;
 
 /**
  * MapStruct mapper for Transaction entity and DTOs
- * Handles mapping between different transaction representations with proper enum mapping
+ * Updated to handle JPA relationships properly
  */
 @Mapper(componentModel = "spring", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
 public interface TransactionMapper {
 
     /**
      * Map CreateTransactionRequest to Transaction entity
-     * Ignores id, userId, accountNumber, and createdTimestamp (will be set by service)
+     * Ignores fields that will be set by service layer including JPA relationships
      */
     @Mapping(target = "id", ignore = true)
-    @Mapping(target = "userId", ignore = true)
-    @Mapping(target = "accountNumber", ignore = true)
+    @Mapping(target = "account", ignore = true) // JPA relationship - set by service
     @Mapping(target = "createdTimestamp", ignore = true)
     @Mapping(target = "type", source = "type")
     @Mapping(target = "currency", source = "currency")
@@ -30,8 +29,9 @@ public interface TransactionMapper {
 
     /**
      * Map Transaction entity to TransactionResponse
-     * Maps enums properly from entity to response DTOs
+     * Uses convenience methods for backward compatibility
      */
+    @Mapping(target = "userId", expression = "java(transaction.getUserId())")
     @Mapping(target = "type", source = "type")
     @Mapping(target = "currency", source = "currency")
     TransactionResponse toResponse(Transaction transaction);

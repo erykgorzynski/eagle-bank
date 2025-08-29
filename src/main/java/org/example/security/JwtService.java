@@ -11,7 +11,6 @@ import javax.crypto.SecretKey;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.Function;
 
 /**
  * JWT Service for generating and validating JWT tokens
@@ -38,47 +37,14 @@ public class JwtService {
     }
 
     /**
-     * Generate JWT token with additional claims
-     *
-     * @param extraClaims Additional claims to include
-     * @param userId      The user ID (subject)
-     * @return Generated JWT token
-     */
-    public String generateToken(Map<String, Object> extraClaims, String userId) {
-        return createToken(extraClaims, userId);
-    }
-
-    /**
      * Extract user ID from JWT token
      *
      * @param token JWT token
      * @return User ID from token's subject claim
      */
     public String extractUserId(String token) {
-        return extractClaim(token, Claims::getSubject);
-    }
-
-    /**
-     * Extract expiration date from JWT token
-     *
-     * @param token JWT token
-     * @return Expiration date
-     */
-    public Date extractExpiration(String token) {
-        return extractClaim(token, Claims::getExpiration);
-    }
-
-    /**
-     * Extract a specific claim from JWT token
-     *
-     * @param token          JWT token
-     * @param claimsResolver Function to extract the desired claim
-     * @param <T>            Type of the claim
-     * @return Extracted claim
-     */
-    public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
         final Claims claims = extractAllClaims(token);
-        return claimsResolver.apply(claims);
+        return claims.getSubject();
     }
 
     /**
@@ -100,7 +66,8 @@ public class JwtService {
      * @return true if token is expired, false otherwise
      */
     public boolean isTokenExpired(String token) {
-        return extractExpiration(token).before(new Date());
+        final Claims claims = extractAllClaims(token);
+        return claims.getExpiration().before(new Date());
     }
 
     /**

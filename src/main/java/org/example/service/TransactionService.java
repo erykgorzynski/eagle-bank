@@ -2,6 +2,7 @@ package org.example.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.entity.Account;
 import org.example.entity.Transaction;
 import org.example.exception.AccountNotFoundException;
 import org.example.exception.InsufficientFundsException;
@@ -10,6 +11,7 @@ import org.example.mapper.TransactionMapper;
 import org.example.model.CreateTransactionRequest;
 import org.example.model.ListTransactionsResponse;
 import org.example.model.TransactionResponse;
+import org.example.repository.AccountRepository;
 import org.example.repository.TransactionRepository;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -20,7 +22,7 @@ import java.util.UUID;
 
 /**
  * Service class for Transaction management operations
- * All operations include user ownership validation for security
+ * Updated to use JPA relationships instead of manual foreign key management
  */
 @Service
 @RequiredArgsConstructor
@@ -29,8 +31,8 @@ import java.util.UUID;
 public class TransactionService {
 
     private final TransactionRepository transactionRepository;
+    private final AccountRepository accountRepository;
     private final TransactionMapper transactionMapper;
-    private final AccountService accountService;
 
     /**
      * Create a new transaction with balance validation and account balance update
@@ -38,11 +40,15 @@ public class TransactionService {
     public TransactionResponse createTransaction(String accountNumber, CreateTransactionRequest createTransactionRequest, String userId) {
         log.info("Creating transaction for account {} by user {}", accountNumber, userId);
 
-        // Validate account ownership and existence
-        validateAccountAccess(accountNumber, userId);
+        // Find the account entity with user loaded (for validation and relationship)
+        Account account = accountRepository.findByAccountNumberWithUser(accountNumber)
+                .orElseThrow(() -> new AccountNotFoundException(accountNumber));
+
+        // Validate account ownership using JPA relationship
+        validateAccountAccess(account, userId);
 
         // Get current account balance
-        double currentBalance = accountService.getAccountBalance(accountNumber, userId);
+        double currentBalance = account.getBalance();
 
         // Validate sufficient funds for withdrawals
         if (CreateTransactionRequest.TypeEnum.WITHDRAWAL.equals(createTransactionRequest.getType())) {
@@ -56,16 +62,25 @@ public class TransactionService {
 
         // Set system-generated fields
         transaction.setId(generateUniqueTransactionId());
-        transaction.setAccountNumber(accountNumber);
-        transaction.setUserId(userId);
         transaction.setCurrency(Transaction.Currency.GBP); // Only GBP supported
+
+        // Use the bidirectional relationship helper method instead of manual setting
+        account.addTransaction(transaction); // This properly sets both sides of the relationship
 
         // Calculate new balance based on transaction type
         double newBalance = calculateNewBalance(currentBalance, createTransactionRequest.getAmount(), createTransactionRequest.getType());
 
-        // Save transaction and update account balance atomically
-        Transaction savedTransaction = transactionRepository.save(transaction);
-        accountService.updateAccountBalance(accountNumber, userId, newBalance);
+        // Update account balance
+        account.setBalance(newBalance);
+
+        // Save account (cascade will save the transaction as well due to CascadeType.ALL)
+        Account savedAccount = accountRepository.save(account);
+
+        // Get the saved transaction from the account's transactions list
+        Transaction savedTransaction = savedAccount.getTransactions().stream()
+                .filter(t -> t.getId().equals(transaction.getId()))
+                .findFirst()
+                .orElse(transaction);
 
         log.info("Successfully created transaction {} for account {} with new balance {}",
                 savedTransaction.getId(), accountNumber, newBalance);
@@ -80,11 +95,15 @@ public class TransactionService {
     public ListTransactionsResponse findByAccountNumber(String accountNumber, String userId) {
         log.info("Finding transactions for account {} by user {}", accountNumber, userId);
 
-        // Validate account ownership
-        validateAccountAccess(accountNumber, userId);
+        // Find account with user loaded for validation
+        Account account = accountRepository.findByAccountNumberWithUser(accountNumber)
+                .orElseThrow(() -> new AccountNotFoundException(accountNumber));
 
-        // Get transactions ordered by newest first
-        List<Transaction> transactions = transactionRepository.findByAccountNumberOrderByCreatedTimestampDesc(accountNumber);
+        // Validate account ownership using JPA relationship
+        validateAccountAccess(account, userId);
+
+        // Get transactions using JPA relationship query - ordered by newest first
+        List<Transaction> transactions = transactionRepository.findByAccount_AccountNumberOrderByCreatedTimestampDesc(accountNumber);
         List<TransactionResponse> transactionResponses = transactionMapper.toResponseList(transactions);
 
         ListTransactionsResponse response = new ListTransactionsResponse();
@@ -101,23 +120,19 @@ public class TransactionService {
     public TransactionResponse findByIdAndAccountNumber(String transactionId, String accountNumber, String userId) {
         log.info("Finding transaction {} for account {} by user {}", transactionId, accountNumber, userId);
 
-        // Validate account ownership
-        validateAccountAccess(accountNumber, userId);
+        // Find account with user loaded for validation
+        Account account = accountRepository.findByAccountNumberWithUser(accountNumber)
+                .orElseThrow(() -> new AccountNotFoundException(accountNumber));
 
-        // Find transaction by ID and account number
-        Transaction transaction = transactionRepository.findByIdAndAccountNumber(transactionId, accountNumber)
+        // Validate account ownership using JPA relationship
+        validateAccountAccess(account, userId);
+
+        // Find transaction by ID and account number using JPA relationship
+        Transaction transaction = transactionRepository.findByIdAndAccount_AccountNumber(transactionId, accountNumber)
                 .orElseThrow(() -> new TransactionNotFoundException(transactionId, accountNumber));
 
         log.info("Found transaction {} for account {}", transactionId, accountNumber);
         return transactionMapper.toResponse(transaction);
-    }
-
-    /**
-     * Check if a transaction exists on a specific account
-     */
-    @Transactional(readOnly = true)
-    public boolean existsByIdAndAccountNumber(String transactionId, String accountNumber) {
-        return transactionRepository.existsByIdAndAccountNumber(transactionId, accountNumber);
     }
 
     /**
@@ -156,18 +171,12 @@ public class TransactionService {
     }
 
     /**
-     * Validate that the user has access to the specified account
+     * Validate that the user has access to the specified account using JPA relationship
      */
-    private void validateAccountAccess(String accountNumber, String userId) {
-        // First check if account exists
-        if (!accountService.accountExists(accountNumber)) {
-            log.warn("Account {} does not exist", accountNumber);
-            throw new AccountNotFoundException(accountNumber);
-        }
-
-        // Then check ownership
-        if (!accountService.isAccountOwnedByUser(accountNumber, userId)) {
-            log.warn("User {} attempted to access account {} which they don't own", userId, accountNumber);
+    private void validateAccountAccess(Account account, String userId) {
+        if (!account.getUser().getId().equals(userId)) {
+            log.warn("User {} attempted to access account {} owned by user {}",
+                     userId, account.getAccountNumber(), account.getUser().getId());
             throw new AccessDeniedException("Access denied to account");
         }
     }

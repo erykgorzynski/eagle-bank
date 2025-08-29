@@ -4,10 +4,13 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Account entity representing bank accounts in the Eagle Bank system
@@ -19,6 +22,7 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@ToString(exclude = {"user", "transactions"}) // Prevent circular reference in toString
 public class Account {
 
     @Id
@@ -29,7 +33,7 @@ public class Account {
     @Column(name = "account_type", nullable = false)
     private AccountType accountType;
 
-    @Column(name = "balance", nullable = false, precision = 10, scale = 2)
+    @Column(name = "balance", nullable = false)
     private Double balance;
 
     @Enumerated(EnumType.STRING)
@@ -43,9 +47,6 @@ public class Account {
     @Column(name = "name", nullable = false)
     private String name;
 
-    @Column(name = "user_id", nullable = false)
-    private String userId; // References User.id (usr-[A-Za-z0-9]+)
-
     @CreationTimestamp
     @Column(name = "created_timestamp", nullable = false, updatable = false)
     private LocalDateTime createdTimestamp;
@@ -53,6 +54,30 @@ public class Account {
     @UpdateTimestamp
     @Column(name = "updated_timestamp", nullable = false)
     private LocalDateTime updatedTimestamp;
+
+    // JPA Relationships
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false, foreignKey = @ForeignKey(name = "fk_account_user"))
+    private User user;
+
+    @OneToMany(mappedBy = "account", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<Transaction> transactions = new ArrayList<>();
+
+    // Helper methods for managing bidirectional relationships
+    public void addTransaction(Transaction transaction) {
+        transactions.add(transaction);
+        transaction.setAccount(this);
+    }
+
+    public void removeTransaction(Transaction transaction) {
+        transactions.remove(transaction);
+        transaction.setAccount(null);
+    }
+
+    // Convenience method to get user ID (for backward compatibility)
+    public String getUserId() {
+        return user != null ? user.getId() : null;
+    }
 
     public enum AccountType {
         PERSONAL

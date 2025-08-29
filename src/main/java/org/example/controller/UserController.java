@@ -10,31 +10,26 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import jakarta.validation.Valid;
 
 /**
  * User Controller implementing the generated UserApi interface
  * Handles user management operations with proper authentication and authorization
  */
 @RestController
-@RequestMapping("/v1/users")
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RequiredArgsConstructor
 @Slf4j
-public class UserController implements UserApi {
+public class UserController extends BaseController implements UserApi {
 
     private final UserService userService;
 
     @Override
-    public ResponseEntity<UserResponse> createUser(@Valid CreateUserRequest createUserRequest) {
+    public ResponseEntity<UserResponse> createUser(CreateUserRequest createUserRequest) {
         log.info("Creating user with email: {}", createUserRequest.getEmail());
 
         UserResponse userResponse = userService.createUser(createUserRequest);
         return new ResponseEntity<>(userResponse, HttpStatus.CREATED);
-        // Note: EmailAlreadyExistsException is now handled by GlobalExceptionHandler
     }
 
     @Override
@@ -44,33 +39,40 @@ public class UserController implements UserApi {
             throw new org.springframework.security.core.AuthenticationException("User not authenticated") {};
         }
 
-        // Check if user is trying to access their own data
+        // First, validate that the user exists (this will throw UserNotFoundException if not found)
+        // This ensures we return 404 for non-existent users before checking authorization
+        UserResponse userResponse = userService.findById(userId);
+
+        // Second, check if user is trying to access their own data (authorization check)
         if (!userId.equals(authenticatedUserId)) {
             log.warn("User {} attempted to access data for user {}", authenticatedUserId, userId);
             throw new org.springframework.security.access.AccessDeniedException("Access denied to user data");
         }
 
-        UserResponse userResponse = userService.findById(userId);
         return ResponseEntity.ok(userResponse);
-        // Note: UserNotFoundException is now handled by GlobalExceptionHandler
     }
 
     @Override
-    public ResponseEntity<UserResponse> updateUserByID(String userId, @Valid UpdateUserRequest updateUserRequest) {
+    public ResponseEntity<UserResponse> updateUserByID(String userId, UpdateUserRequest updateUserRequest) {
         String authenticatedUserId = getCurrentUserId();
         if (authenticatedUserId == null) {
             throw new org.springframework.security.core.AuthenticationException("User not authenticated") {};
         }
 
-        // Check if user is trying to update their own data
+        // First, validate that the user exists (this will throw UserNotFoundException if not found)
+        // This ensures we return 404 for non-existent users before checking authorization
+        userService.findById(userId);
+
+        // Second, check if user is trying to update their own data (authorization check)
         if (!userId.equals(authenticatedUserId)) {
             log.warn("User {} attempted to update data for user {}", authenticatedUserId, userId);
             throw new org.springframework.security.access.AccessDeniedException("Access denied to user data");
         }
 
+        // Third, attempt the update
         UserResponse userResponse = userService.updateUser(userId, updateUserRequest);
         return ResponseEntity.ok(userResponse);
-        // Note: UserNotFoundException and EmailAlreadyExistsException are handled by GlobalExceptionHandler
+        // Note: UserNotFoundException is handled by GlobalExceptionHandler
     }
 
     @Override
@@ -80,25 +82,18 @@ public class UserController implements UserApi {
             throw new org.springframework.security.core.AuthenticationException("User not authenticated") {};
         }
 
-        // Check if user is trying to delete their own data
+        // First, validate that the user exists (this will throw UserNotFoundException if not found)
+        // This ensures we return 404 for non-existent users before checking authorization
+        userService.findById(userId);
+
+        // Second, check if user is trying to delete their own data (authorization check)
         if (!userId.equals(authenticatedUserId)) {
             log.warn("User {} attempted to delete user {}", authenticatedUserId, userId);
             throw new org.springframework.security.access.AccessDeniedException("Access denied to user data");
         }
 
+        // Third, attempt the deletion (this will also handle UserHasAssociatedAccountsException)
         userService.deleteUser(userId);
         return ResponseEntity.noContent().build();
-        // Note: UserNotFoundException and UserHasAssociatedAccountsException are handled by GlobalExceptionHandler
-    }
-
-    /**
-     * Helper method to get current authenticated user ID from JWT token
-     */
-    private String getCurrentUserId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.isAuthenticated() && authentication.getPrincipal() instanceof String) {
-            return (String) authentication.getPrincipal();
-        }
-        return null;
     }
 }

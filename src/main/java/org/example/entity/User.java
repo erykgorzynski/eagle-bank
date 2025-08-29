@@ -4,10 +4,13 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * User entity representing users in the Eagle Bank system
@@ -19,6 +22,7 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@ToString(exclude = "accounts") // Prevent circular reference in toString
 public class User {
 
     @Id
@@ -47,4 +51,19 @@ public class User {
     @UpdateTimestamp
     @Column(name = "updated_timestamp", nullable = false)
     private LocalDateTime updatedTimestamp;
+
+    // JPA Relationships
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<Account> accounts = new ArrayList<>();
+
+    // Helper methods for managing bidirectional relationship
+    public void addAccount(Account account) {
+        accounts.add(account);
+        account.setUser(this);
+    }
+
+    public void removeAccount(Account account) {
+        accounts.remove(account);
+        account.setUser(null);
+    }
 }

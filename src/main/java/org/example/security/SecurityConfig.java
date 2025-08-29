@@ -11,12 +11,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-
-import java.util.Arrays;
-import java.util.List;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 /**
  * Security Configuration for JWT Authentication
@@ -35,24 +30,31 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-            // Disable CSRF for REST API
+            // Disable CSRF for REST API and H2 console
             .csrf(AbstractHttpConfigurer::disable)
 
-            // Configure CORS
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            // Disable frame options for H2 console
+            .headers(headers -> headers.frameOptions().disable())
 
             // Configure authorization
             .authorizeHttpRequests(auth -> auth
                 // Public endpoints - no authentication required
-                .requestMatchers("/v1/users").permitAll()  // POST only (user creation)
-                .requestMatchers("/v1/auth/login").permitAll()  // POST only (login)
+                .requestMatchers(new AntPathRequestMatcher("/v1/users", "POST")).permitAll()  // User creation
+                .requestMatchers(new AntPathRequestMatcher("/v1/auth/login", "POST")).permitAll()  // Login
 
                 // Swagger/OpenAPI endpoints
-                .requestMatchers("/swagger-ui/**", "/swagger-ui.html").permitAll()
-                .requestMatchers("/api-docs/**", "/v3/api-docs/**").permitAll()
+                .requestMatchers(new AntPathRequestMatcher("/swagger-ui/**")).permitAll()
+                .requestMatchers(new AntPathRequestMatcher("/swagger-ui.html")).permitAll()
+                .requestMatchers(new AntPathRequestMatcher("/v3/api-docs/**")).permitAll()
+                .requestMatchers(new AntPathRequestMatcher("/api-docs/**")).permitAll()
+                .requestMatchers(new AntPathRequestMatcher("/swagger-resources/**")).permitAll()
+                .requestMatchers(new AntPathRequestMatcher("/webjars/**")).permitAll()
+
+                // H2 Database Console (for development)
+                .requestMatchers(new AntPathRequestMatcher("/h2-console/**")).permitAll()
 
                 // Health check endpoints
-                .requestMatchers("/actuator/health").permitAll()
+                .requestMatchers(new AntPathRequestMatcher("/actuator/health")).permitAll()
 
                 // All other endpoints require authentication
                 .anyRequest().authenticated()
@@ -67,34 +69,6 @@ public class SecurityConfig {
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
-    }
-
-    /**
-     * CORS Configuration Source
-     */
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
-
-        // Allow specific origins (configure as needed for production)
-        configuration.setAllowedOriginPatterns(List.of("*"));
-
-        // Allow all HTTP methods
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-
-        // Allow all headers
-        configuration.setAllowedHeaders(Arrays.asList("*"));
-
-        // Allow credentials
-        configuration.setAllowCredentials(true);
-
-        // Cache preflight response for 1 hour
-        configuration.setMaxAge(3600L);
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
-
-        return source;
     }
 
     /**

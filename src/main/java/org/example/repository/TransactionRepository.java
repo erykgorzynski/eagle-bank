@@ -9,45 +9,25 @@ import java.util.Optional;
 
 /**
  * Repository for Transaction entity operations
- * Primary key operations use id (String) as the identifier
+ * Maps directly to the transaction API scenarios
  */
 @Repository
 public interface TransactionRepository extends JpaRepository<Transaction, String> {
 
     /**
-     * Find all transactions for a specific account
+     * Find all transactions for a specific account ordered by creation timestamp descending
+     * Used for: GET /v1/accounts/{accountId}/transactions
      * @param accountNumber the account number
-     * @return list of transactions for the account
+     * @return list of transactions ordered by newest first
      */
-    List<Transaction> findByAccountNumber(String accountNumber);
+    List<Transaction> findByAccount_AccountNumberOrderByCreatedTimestampDesc(String accountNumber);
 
     /**
-     * Find transaction by ID and account number (for validation)
+     * Find a specific transaction by ID within a specific account
+     * Used for: GET /v1/accounts/{accountId}/transactions/{transactionId}
      * @param id the transaction ID
      * @param accountNumber the account number
      * @return Optional containing transaction if found on specified account
      */
-    Optional<Transaction> findByIdAndAccountNumber(String id, String accountNumber);
-
-    /**
-     * Check if a transaction exists with the given ID and account number
-     * @param id the transaction ID
-     * @param accountNumber the account number
-     * @return true if transaction exists on specified account
-     */
-    boolean existsByIdAndAccountNumber(String id, String accountNumber);
-
-    /**
-     * Find all transactions for a specific user (across all their accounts)
-     * @param userId the user ID
-     * @return list of transactions for the user
-     */
-    List<Transaction> findByUserId(String userId);
-
-    /**
-     * Find transactions by account number ordered by creation timestamp descending
-     * @param accountNumber the account number
-     * @return list of transactions ordered by newest first
-     */
-    List<Transaction> findByAccountNumberOrderByCreatedTimestampDesc(String accountNumber);
+    Optional<Transaction> findByIdAndAccount_AccountNumber(String id, String accountNumber);
 }

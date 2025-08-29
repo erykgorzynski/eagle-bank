@@ -129,6 +129,14 @@ public class AccountService {
     }
 
     /**
+     * Check if an account exists (used for validation)
+     */
+    @Transactional(readOnly = true)
+    public boolean accountExists(String accountNumber) {
+        return accountRepository.existsByAccountNumber(accountNumber);
+    }
+
+    /**
      * Check if an account is owned by a specific user
      */
     @Transactional(readOnly = true)

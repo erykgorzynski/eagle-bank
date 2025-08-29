@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.example.exception.AccountNotFoundException;
 import org.example.exception.EmailAlreadyExistsException;
 import org.example.exception.InsufficientFundsException;
+import org.example.exception.TransactionNotFoundException;
 import org.example.exception.UserHasAssociatedAccountsException;
 import org.example.exception.UserNotFoundException;
 import org.example.model.BadRequestErrorResponse;
@@ -63,6 +64,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccountNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleAccountNotFoundException(AccountNotFoundException e) {
         log.warn("Account not found: {}", e.getMessage());
+        ErrorResponse errorResponse = new ErrorResponse();
+        errorResponse.setMessage(e.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+    }
+
+    @ExceptionHandler(TransactionNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleTransactionNotFoundException(TransactionNotFoundException e) {
+        log.warn("Transaction not found: {}", e.getMessage());
         ErrorResponse errorResponse = new ErrorResponse();
         errorResponse.setMessage(e.getMessage());
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);

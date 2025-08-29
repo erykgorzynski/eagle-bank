@@ -6,6 +6,7 @@ import org.example.api.AccountApi;
 import org.example.api.TransactionApi;
 import org.example.model.*;
 import org.example.service.AccountService;
+import org.example.service.TransactionService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -30,6 +31,7 @@ import java.util.ArrayList;
 public class AccountController implements AccountApi, TransactionApi {
 
     private final AccountService accountService;
+    private final TransactionService transactionService;
 
     // ============= ACCOUNT OPERATIONS =============
 
@@ -101,40 +103,12 @@ public class AccountController implements AccountApi, TransactionApi {
             throw new org.springframework.security.core.AuthenticationException("User not authenticated") {};
         }
 
-        // TODO: Verify account ownership
-        if (!isAccountOwnedByUser(accountNumber, authenticatedUserId)) {
-            throw new org.springframework.security.access.AccessDeniedException("Access denied to account");
-        }
+        // Create transaction using transaction service (includes all validation)
+        TransactionResponse transaction = transactionService.createTransaction(
+            accountNumber, createTransactionRequest, authenticatedUserId
+        );
 
-        // TODO: Validate account exists and handle insufficient funds
-        // BankAccountResponse account = accountService.findByAccountNumber(accountNumber);
-        // if (account == null) {
-        //     throw new AccountNotFoundException(accountNumber);
-        // }
-        //
-        // if (CreateTransactionRequest.TypeEnum.WITHDRAWAL.equals(createTransactionRequest.getType())) {
-        //     double currentBalance = account.getBalance();
-        //     if (currentBalance < createTransactionRequest.getAmount()) {
-        //         throw new InsufficientFundsException("Insufficient funds for withdrawal");
-        //     }
-        // }
-
-        // TODO: Call transaction service
-        // TransactionResponse transaction = transactionService.createTransaction(
-        //     accountNumber, createTransactionRequest, authenticatedUserId
-        // );
-
-        // Example response - replace with actual implementation
-        TransactionResponse response = new TransactionResponse();
-        response.setId("tan-" + System.currentTimeMillis());
-        response.setAmount(createTransactionRequest.getAmount());
-        response.setCurrency(TransactionResponse.CurrencyEnum.GBP);
-        response.setType(TransactionResponse.TypeEnum.valueOf(createTransactionRequest.getType().name()));
-        response.setReference(createTransactionRequest.getReference());
-        response.setUserId(authenticatedUserId);
-        response.setCreatedTimestamp(LocalDateTime.now());
-
-        return new ResponseEntity<>(response, HttpStatus.CREATED);
+        return new ResponseEntity<>(transaction, HttpStatus.CREATED);
     }
 
     @Override
@@ -144,17 +118,8 @@ public class AccountController implements AccountApi, TransactionApi {
             throw new org.springframework.security.core.AuthenticationException("User not authenticated") {};
         }
 
-        // TODO: Verify account ownership
-        if (!isAccountOwnedByUser(accountNumber, authenticatedUserId)) {
-            throw new org.springframework.security.access.AccessDeniedException("Access denied to account");
-        }
-
-        // TODO: Call transaction service
-        // List<TransactionResponse> transactions = transactionService.findByAccountNumber(accountNumber);
-
-        // Example response - replace with actual implementation
-        ListTransactionsResponse response = new ListTransactionsResponse();
-        response.setTransactions(new ArrayList<>());
+        // Get transactions using transaction service (includes ownership validation)
+        ListTransactionsResponse response = transactionService.findByAccountNumber(accountNumber, authenticatedUserId);
 
         return ResponseEntity.ok(response);
     }
@@ -168,30 +133,12 @@ public class AccountController implements AccountApi, TransactionApi {
             throw new org.springframework.security.core.AuthenticationException("User not authenticated") {};
         }
 
-        // TODO: Verify account ownership
-        if (!isAccountOwnedByUser(accountNumber, authenticatedUserId)) {
-            throw new org.springframework.security.access.AccessDeniedException("Access denied to account");
-        }
+        // Get specific transaction using transaction service (includes all validation)
+        TransactionResponse transaction = transactionService.findByIdAndAccountNumber(
+            transactionId, accountNumber, authenticatedUserId
+        );
 
-        // TODO: Call transaction service and validate transaction exists
-        // TransactionResponse transaction = transactionService.findByIdAndAccountNumber(
-        //     transactionId, accountNumber
-        // );
-        // if (transaction == null) {
-        //     throw new TransactionNotFoundException(transactionId);
-        // }
-
-        // Example response - replace with actual implementation
-        TransactionResponse response = new TransactionResponse();
-        response.setId(transactionId);
-        response.setAmount(100.0);
-        response.setCurrency(TransactionResponse.CurrencyEnum.GBP);
-        response.setType(TransactionResponse.TypeEnum.DEPOSIT);
-        response.setReference("Example transaction");
-        response.setUserId(authenticatedUserId);
-        response.setCreatedTimestamp(LocalDateTime.now().minusHours(1));
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(transaction);
     }
 
     // ============= HELPER METHODS =============

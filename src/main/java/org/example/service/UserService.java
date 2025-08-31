@@ -33,31 +33,21 @@ public class UserService {
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
 
-    /**
-     * Create a new user with password hashing
-     */
     public UserResponse createUser(CreateUserRequest createUserRequest) {
         log.info("Creating user with email: {}", createUserRequest.getEmail());
 
-        // Map request to entity
         User user = userMapper.toEntity(createUserRequest);
 
-        // Generate userId with usr- prefix
         user.setId(generateUserId());
 
-        // Hash password
         user.setPasswordHash(passwordEncoder.encode(createUserRequest.getPassword()));
 
-        // Save user
         User savedUser = userRepository.save(user);
 
         log.info("Successfully created user with ID: {}", savedUser.getId());
         return userMapper.toResponse(savedUser);
     }
 
-    /**
-     * Find user by userId (primary operation)
-     */
     @Transactional(readOnly = true)
     public UserResponse findById(String userId) {
         log.info("Finding user by ID: {}", userId);
@@ -68,16 +58,12 @@ public class UserService {
         return userMapper.toResponse(user);
     }
 
-    /**
-     * Update user by userId
-     */
     public UserResponse updateUser(String userId, UpdateUserRequest updateUserRequest) {
         log.info("Updating user with ID: {}", userId);
 
         User existingUser = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
 
-        // Update entity with non-null values from request
         userMapper.updateEntityFromRequest(updateUserRequest, existingUser);
 
         User updatedUser = userRepository.save(existingUser);
@@ -86,9 +72,6 @@ public class UserService {
         return userMapper.toResponse(updatedUser);
     }
 
-    /**
-     * Delete user by userId
-     */
     public void deleteUser(String userId) {
         log.info("Deleting user with ID: {}", userId);
 
@@ -96,7 +79,6 @@ public class UserService {
             throw new UserNotFoundException(userId);
         }
 
-        // Check if user has associated bank accounts
         boolean hasAssociatedAccounts = accountRepository.existsByUserId(userId);
         log.debug("User {} has associated accounts: {}", userId, hasAssociatedAccounts);
 
@@ -109,18 +91,12 @@ public class UserService {
         log.info("Successfully deleted user with ID: {}", userId);
     }
 
-    /**
-     * Find user by email (for authentication only)
-     */
     @Transactional(readOnly = true)
     public Optional<User> findByEmail(String email) {
         log.debug("Finding user by email for authentication: {}", email);
         return userRepository.findByEmail(email);
     }
 
-    /**
-     * Generate unique userId with usr- prefix
-     */
     private String generateUserId() {
         return "usr-" + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
     }

@@ -34,49 +34,35 @@ public class TransactionService {
     private final AccountRepository accountRepository;
     private final TransactionMapper transactionMapper;
 
-    /**
-     * Create a new transaction with balance validation and account balance update
-     */
     public TransactionResponse createTransaction(String accountNumber, CreateTransactionRequest createTransactionRequest, String userId) {
         log.info("Creating transaction for account {} by user {}", accountNumber, userId);
 
-        // Find the account entity with user loaded (for validation and relationship)
         Account account = accountRepository.findByAccountNumberWithUser(accountNumber)
                 .orElseThrow(() -> new AccountNotFoundException(accountNumber));
 
-        // Validate account ownership using JPA relationship
         validateAccountAccess(account, userId);
 
-        // Get current account balance
         double currentBalance = account.getBalance();
 
-        // Validate sufficient funds for withdrawals
         if (CreateTransactionRequest.TypeEnum.WITHDRAWAL.equals(createTransactionRequest.getType())) {
             if (currentBalance < createTransactionRequest.getAmount()) {
                 throw new InsufficientFundsException(accountNumber, createTransactionRequest.getAmount(), currentBalance);
             }
         }
 
-        // Map request to entity
         Transaction transaction = transactionMapper.toEntity(createTransactionRequest);
 
-        // Set system-generated fields
         transaction.setId(generateUniqueTransactionId());
-        transaction.setCurrency(Transaction.Currency.GBP); // Only GBP supported
+        transaction.setCurrency(Transaction.Currency.GBP);
 
-        // Use the bidirectional relationship helper method instead of manual setting
-        account.addTransaction(transaction); // This properly sets both sides of the relationship
+        account.addTransaction(transaction);
 
-        // Calculate new balance based on transaction type
         double newBalance = calculateNewBalance(currentBalance, createTransactionRequest.getAmount(), createTransactionRequest.getType());
 
-        // Update account balance
         account.setBalance(newBalance);
 
-        // Save account (cascade will save the transaction as well due to CascadeType.ALL)
         Account savedAccount = accountRepository.save(account);
 
-        // Get the saved transaction from the account's transactions list
         Transaction savedTransaction = savedAccount.getTransactions().stream()
                 .filter(t -> t.getId().equals(transaction.getId()))
                 .findFirst()
@@ -88,21 +74,15 @@ public class TransactionService {
         return transactionMapper.toResponse(savedTransaction);
     }
 
-    /**
-     * List all transactions for a specific account with ownership validation
-     */
     @Transactional(readOnly = true)
     public ListTransactionsResponse findByAccountNumber(String accountNumber, String userId) {
         log.info("Finding transactions for account {} by user {}", accountNumber, userId);
 
-        // Find account with user loaded for validation
         Account account = accountRepository.findByAccountNumberWithUser(accountNumber)
                 .orElseThrow(() -> new AccountNotFoundException(accountNumber));
 
-        // Validate account ownership using JPA relationship
         validateAccountAccess(account, userId);
 
-        // Get transactions using JPA relationship query - ordered by newest first
         List<Transaction> transactions = transactionRepository.findByAccount_AccountNumberOrderByCreatedTimestampDesc(accountNumber);
         List<TransactionResponse> transactionResponses = transactionMapper.toResponseList(transactions);
 
@@ -113,21 +93,15 @@ public class TransactionService {
         return response;
     }
 
-    /**
-     * Find transaction by ID and account number with ownership validation
-     */
     @Transactional(readOnly = true)
     public TransactionResponse findByIdAndAccountNumber(String transactionId, String accountNumber, String userId) {
         log.info("Finding transaction {} for account {} by user {}", transactionId, accountNumber, userId);
 
-        // Find account with user loaded for validation
         Account account = accountRepository.findByAccountNumberWithUser(accountNumber)
                 .orElseThrow(() -> new AccountNotFoundException(accountNumber));
 
-        // Validate account ownership using JPA relationship
         validateAccountAccess(account, userId);
 
-        // Find transaction by ID and account number using JPA relationship
         Transaction transaction = transactionRepository.findByIdAndAccount_AccountNumber(transactionId, accountNumber)
                 .orElseThrow(() -> new TransactionNotFoundException(transactionId, accountNumber));
 
@@ -135,22 +109,17 @@ public class TransactionService {
         return transactionMapper.toResponse(transaction);
     }
 
-    /**
-     * Generate unique transaction ID with tan- prefix
-     */
     private String generateUniqueTransactionId() {
         String transactionId;
         int attempts = 0;
         final int maxAttempts = 100;
 
         do {
-            // Generate UUID-based ID with tan- prefix
             String uuid = UUID.randomUUID().toString().replaceAll("-", "");
-            transactionId = "tan-" + uuid.substring(0, 12); // Use first 12 characters for shorter IDs
+            transactionId = "tan-" + uuid.substring(0, 12);
             attempts++;
 
             if (attempts >= maxAttempts) {
-                // Fallback to timestamp-based generation if UUID fails
                 transactionId = "tan-" + System.currentTimeMillis() + "-" + (int)(Math.random() * 1000);
                 break;
             }
@@ -160,9 +129,6 @@ public class TransactionService {
         return transactionId;
     }
 
-    /**
-     * Calculate new account balance based on transaction type
-     */
     private double calculateNewBalance(double currentBalance, double transactionAmount, CreateTransactionRequest.TypeEnum transactionType) {
         return switch (transactionType) {
             case DEPOSIT -> currentBalance + transactionAmount;
@@ -170,9 +136,6 @@ public class TransactionService {
         };
     }
 
-    /**
-     * Validate that the user has access to the specified account using JPA relationship
-     */
     private void validateAccountAccess(Account account, String userId) {
         if (!account.getUser().getId().equals(userId)) {
             log.warn("User {} attempted to access account {} owned by user {}",

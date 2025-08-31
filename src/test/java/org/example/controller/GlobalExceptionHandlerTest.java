@@ -40,20 +40,6 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    void handleEmailAlreadyExistsExceptionReturnsBadRequestWithValidationDetails() {
-        EmailAlreadyExistsException exception = new EmailAlreadyExistsException("test@example.com");
-
-        ResponseEntity<BadRequestErrorResponse> response = globalExceptionHandler.handleEmailAlreadyExistsException(exception);
-
-        assertEquals(400, response.getStatusCode().value());
-        assertEquals("Invalid details supplied", response.getBody().getMessage());
-        assertEquals(1, response.getBody().getDetails().size());
-        assertEquals("email", response.getBody().getDetails().get(0).getField());
-        assertEquals("Email already exists", response.getBody().getDetails().get(0).getMessage());
-        assertEquals("EMAIL_ALREADY_EXISTS", response.getBody().getDetails().get(0).getType());
-    }
-
-    @Test
     void handleUserHasAssociatedAccountsExceptionReturnsConflictWithErrorMessage() {
         UserHasAssociatedAccountsException exception = new UserHasAssociatedAccountsException("usr-123");
 

@@ -22,7 +22,7 @@ public interface UserMapper {
      */
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "passwordHash", ignore = true)
-    @Mapping(target = "accounts", ignore = true) // JPA relationship - managed by JPA
+    @Mapping(target = "accounts", ignore = true)
     @Mapping(target = "createdTimestamp", ignore = true)
     @Mapping(target = "updatedTimestamp", ignore = true)
     User toEntity(CreateUserRequest createUserRequest);

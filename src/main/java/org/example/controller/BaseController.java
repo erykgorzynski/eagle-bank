@@ -9,10 +9,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
  */
 public abstract class BaseController {
 
-    /**
-     * Helper method to get current authenticated user ID from JWT token
-     * @return the current authenticated user ID, or null if not authenticated
-     */
     protected String getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null && authentication.isAuthenticated() && authentication.getPrincipal() instanceof String) {

@@ -21,7 +21,7 @@ public interface TransactionMapper {
      * Ignores fields that will be set by service layer including JPA relationships
      */
     @Mapping(target = "id", ignore = true)
-    @Mapping(target = "account", ignore = true) // JPA relationship - set by service
+    @Mapping(target = "account", ignore = true)
     @Mapping(target = "createdTimestamp", ignore = true)
     @Mapping(target = "type", source = "type")
     @Mapping(target = "currency", source = "currency")

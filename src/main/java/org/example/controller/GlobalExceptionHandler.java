@@ -2,7 +2,6 @@ package org.example.controller;
 
 import lombok.extern.slf4j.Slf4j;
 import org.example.exception.AccountNotFoundException;
-import org.example.exception.EmailAlreadyExistsException;
 import org.example.exception.InsufficientFundsException;
 import org.example.exception.TransactionNotFoundException;
 import org.example.exception.UserHasAssociatedAccountsException;
@@ -35,22 +34,6 @@ public class GlobalExceptionHandler {
         ErrorResponse errorResponse = new ErrorResponse();
         errorResponse.setMessage(e.getMessage());
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
-    }
-
-    @ExceptionHandler(EmailAlreadyExistsException.class)
-    public ResponseEntity<BadRequestErrorResponse> handleEmailAlreadyExistsException(EmailAlreadyExistsException e) {
-        log.warn("Email already exists: {}", e.getMessage());
-
-        BadRequestErrorResponse errorResponse = new BadRequestErrorResponse();
-        errorResponse.setMessage("Invalid details supplied");
-
-        BadRequestErrorResponseDetailsInner detail = new BadRequestErrorResponseDetailsInner();
-        detail.setField("email");
-        detail.setMessage("Email already exists");
-        detail.setType("EMAIL_ALREADY_EXISTS");
-
-        errorResponse.setDetails(List.of(detail));
-        return ResponseEntity.badRequest().body(errorResponse);
     }
 
     @ExceptionHandler(UserHasAssociatedAccountsException.class)

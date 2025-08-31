@@ -88,7 +88,6 @@ public class AccountController extends BaseController implements AccountApi, Tra
     }
 
     // ============= TRANSACTION OPERATIONS =============
-
     @Override
     public ResponseEntity<TransactionResponse> createTransaction(
             String accountNumber,
@@ -98,7 +97,6 @@ public class AccountController extends BaseController implements AccountApi, Tra
             throw new org.springframework.security.core.AuthenticationException("User not authenticated") {};
         }
 
-        // Create transaction using transaction service (includes all validation)
         TransactionResponse transaction = transactionService.createTransaction(
             accountNumber, createTransactionRequest, authenticatedUserId
         );
@@ -113,7 +111,6 @@ public class AccountController extends BaseController implements AccountApi, Tra
             throw new org.springframework.security.core.AuthenticationException("User not authenticated") {};
         }
 
-        // Get transactions using transaction service (includes ownership validation)
         ListTransactionsResponse response = transactionService.findByAccountNumber(accountNumber, authenticatedUserId);
 
         return ResponseEntity.ok(response);
@@ -128,7 +125,6 @@ public class AccountController extends BaseController implements AccountApi, Tra
             throw new org.springframework.security.core.AuthenticationException("User not authenticated") {};
         }
 
-        // Get specific transaction using transaction service (includes all validation)
         TransactionResponse transaction = transactionService.findByIdAndAccountNumber(
             transactionId, accountNumber, authenticatedUserId
         );

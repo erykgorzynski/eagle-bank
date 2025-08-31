@@ -34,13 +34,10 @@ public class AuthController implements AuthApi {
     public ResponseEntity<LoginResponse> loginUser(LoginUserRequest loginUserRequest) {
         log.info("Login attempt for email: {}", loginUserRequest.getEmail());
 
-        // Authenticate user - this will throw BadCredentialsException if invalid
         User authenticatedUser = authenticateUser(loginUserRequest.getEmail(), loginUserRequest.getPassword());
 
-        // Generate JWT token
         String jwtToken = jwtService.generateToken(authenticatedUser.getId());
 
-        // Create successful response using the new LoginResponse model
         LoginResponse response = new LoginResponse();
         response.setToken(jwtToken);
         response.setUserId(authenticatedUser.getId());
@@ -49,13 +46,6 @@ public class AuthController implements AuthApi {
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * Authenticate user using UserService
-     * @param email user email
-     * @param password user password
-     * @return authenticated User entity
-     * @throws BadCredentialsException if authentication fails (handled by GlobalExceptionHandler)
-     */
     private User authenticateUser(String email, String password) {
         try {
             Optional<User> userOptional = userService.findByEmail(email);
@@ -63,25 +53,20 @@ public class AuthController implements AuthApi {
             if (userOptional.isPresent()) {
                 User user = userOptional.get();
 
-                // Verify password using passwordEncoder
                 if (passwordEncoder.matches(password, user.getPasswordHash())) {
                     log.info("Authentication successful for user: {}", user.getId());
                     return user;
                 }
             }
 
-            // Authentication failed - throw exception to be handled by GlobalExceptionHandler
             log.warn("Authentication failed for email: {}", email);
             throw new BadCredentialsException("Invalid email or password");
 
         } catch (Exception e) {
-            // Only catch unexpected exceptions and wrap them
             if (e instanceof BadCredentialsException) {
-                // Let BadCredentialsException propagate naturally to GlobalExceptionHandler
                 throw e;
             }
 
-            // Wrap unexpected exceptions
             log.error("Error during authentication for email {}: {}", email, e.getMessage(), e);
             throw new RuntimeException("Authentication error", e);
         }

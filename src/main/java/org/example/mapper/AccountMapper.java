@@ -52,8 +52,8 @@ public interface AccountMapper {
      */
     @Mapping(target = "accountNumber", ignore = true)
     @Mapping(target = "balance", ignore = true)
-    @Mapping(target = "user", ignore = true) // JPA relationship - don't modify
-    @Mapping(target = "transactions", ignore = true) // JPA relationship - don't modify
+    @Mapping(target = "user", ignore = true)
+    @Mapping(target = "transactions", ignore = true)
     @Mapping(target = "createdTimestamp", ignore = true)
     @Mapping(target = "updatedTimestamp", ignore = true)
     @Mapping(target = "currency", ignore = true)

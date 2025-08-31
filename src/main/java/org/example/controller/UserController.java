@@ -7,8 +7,6 @@ import org.example.model.*;
 import org.example.service.UserService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -39,11 +37,8 @@ public class UserController extends BaseController implements UserApi {
             throw new org.springframework.security.core.AuthenticationException("User not authenticated") {};
         }
 
-        // First, validate that the user exists (this will throw UserNotFoundException if not found)
-        // This ensures we return 404 for non-existent users before checking authorization
         UserResponse userResponse = userService.findById(userId);
 
-        // Second, check if user is trying to access their own data (authorization check)
         if (!userId.equals(authenticatedUserId)) {
             log.warn("User {} attempted to access data for user {}", authenticatedUserId, userId);
             throw new org.springframework.security.access.AccessDeniedException("Access denied to user data");
@@ -59,20 +54,15 @@ public class UserController extends BaseController implements UserApi {
             throw new org.springframework.security.core.AuthenticationException("User not authenticated") {};
         }
 
-        // First, validate that the user exists (this will throw UserNotFoundException if not found)
-        // This ensures we return 404 for non-existent users before checking authorization
         userService.findById(userId);
 
-        // Second, check if user is trying to update their own data (authorization check)
         if (!userId.equals(authenticatedUserId)) {
             log.warn("User {} attempted to update data for user {}", authenticatedUserId, userId);
             throw new org.springframework.security.access.AccessDeniedException("Access denied to user data");
         }
 
-        // Third, attempt the update
         UserResponse userResponse = userService.updateUser(userId, updateUserRequest);
         return ResponseEntity.ok(userResponse);
-        // Note: UserNotFoundException is handled by GlobalExceptionHandler
     }
 
     @Override
@@ -82,17 +72,13 @@ public class UserController extends BaseController implements UserApi {
             throw new org.springframework.security.core.AuthenticationException("User not authenticated") {};
         }
 
-        // First, validate that the user exists (this will throw UserNotFoundException if not found)
-        // This ensures we return 404 for non-existent users before checking authorization
         userService.findById(userId);
 
-        // Second, check if user is trying to delete their own data (authorization check)
         if (!userId.equals(authenticatedUserId)) {
             log.warn("User {} attempted to delete user {}", authenticatedUserId, userId);
             throw new org.springframework.security.access.AccessDeniedException("Access denied to user data");
         }
 
-        // Third, attempt the deletion (this will also handle UserHasAssociatedAccountsException)
         userService.deleteUser(userId);
         return ResponseEntity.noContent().build();
     }
